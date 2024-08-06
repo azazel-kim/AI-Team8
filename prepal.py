@@ -1,7 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 
-openai_api_key = 'open-api key'
+openai_api_key = 'openapi-key'
 # OpenAI 클라이언트 생성
 client = OpenAI(api_key=openai_api_key)
 
@@ -10,7 +10,7 @@ if 'messages' not in st.session_state:
 if 'introduction_submitted' not in st.session_state:
     st.session_state.introduction_submitted = False
 if 'feedback' not in st.session_state:
-    st.session_state.feedback = ''
+    st.session_state.feedback = []
     # feedback_prompt = "이렇게 영업 직무에 신입으로 지원하고자 하는 사람의 자소서가 있어. 그리고 크라운제과의 성장을 언급하셨습니다. 이 회사가 다른 기업들과 비교하여 특별히 매력적이라고 느낀 이유는 무엇인가요? 멋있어어요 이런식으로 면접 질문과 그에 대한 답변이 주어질거야. 그러면 자소서를 바탕으로 질문에 대한 답변이 올바른지, 부족하거나 고쳐야 할 부분이 있다면 무엇이 있을지 적극적으로 피드백 해줬으면 좋겠어. 출력 형식을 예시를 들어주면 만약 답변이 부실할 경우에는 개선점 : ~~ 답변 예시: ~~ 이렇게 보여줬으면 좋겠고 좋은 답변을 했을 경우에도 어느 부분이 좋았는지 간단하게 설명해주면 좋을 것 같아. 여기서 출력시 주의사항은 알겠습니다. 피드백을 작성하겠습니다. 이런 텍스트 없이 그냥 깔끔하게 개선점 : ~~ 답변 예시: ~~ 이런 피드백에 관련된 텍스트들만 출력될 수 있게 해줘"
 
 
@@ -77,18 +77,6 @@ else:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
-            
-            # qu_answer=[
-            #             {"role": m["role"], "content": m["content"]}
-            #             for m in st.session_state.messages[-2:]
-            #         ]
-            # stream = client.chat.completions.create(
-            #     model="gpt-4o-mini",
-            #     messages=[
-            #         {"role": 'user', "content": introduction + feedback_prompt + qu_answer}
-            #     ],
-            #     stream=True,
-            # )
 
             # OpenAI API를 사용하여 응답 생성
             if st.session_state.messages:
@@ -106,26 +94,35 @@ else:
                     response = st.write_stream(stream)
                 st.session_state.messages.append({"role": "assistant", "content": response})   
 
+            feedback_prompt = f"""
+            자소서:
+            {introduction}
+            질문:
+            {st.session_state.messages[-3]['content']}
+            답변:
+            {st.session_state.messages[-2]['content']}
+            이렇게 영업 직무에 신입으로 지원하고자 하는 사람의 자소서가 있어.
+            그리고 크라운제과의 성장을 언급하셨습니다.
+            이 회사가 다른 기업들과 비교하여 특별히 매력적이라고 느낀 이유는 무엇인가요? 멋있어어요
+            이런식으로 면접 질문과 그에 대한 답변이 주어질거야. 그러면 자소서를 바탕으로 질문에 대한 답변이 올바른지,
+            부족하거나 고쳐야 할 부분이 있다면 무엇이 있을지 적극적으로 피드백 해줬으면 좋겠어.
+            출력 형식을 예시를 들어주면 만약 답변이 부실할 경우에는 개선점 : ~~ 답변 예시: ~~ 이렇게 보여줬으면 좋겠고
+            좋은 답변을 했을 경우에도 어느 부분이 좋았는지 간단하게 설명해주면 좋을 것 같아. 여기서 출력시 주의사항은 알겠습니다.
+            피드백을 작성하겠습니다. 이런 텍스트 없이 그냥 깔끔하게 개선점 : ~~ 답변 예시: ~~ 이런 피드백에 관련된 텍스트들만 출력될 수 있게 해줘
+            """
+            feedback_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": feedback_prompt}
+            ],
+            # stream=True,
+            )
+            st.session_state.feedback.append(feedback_response.choices[0].message.content)
+
     with col2:  
         # 피드백 생성
-        feedback = "좋은 답변입니다. 하지만 좀 더 구체적인 예시를 들어주시면 좋겠습니다."
-        st.session_state.feedback = feedback
+        # feedback = "좋은 답변입니다. 하지만 좀 더 구체적인 예시를 들어주시면 좋겠습니다."
         
         st.subheader("피드백")
-
-        # OpenAI API를 사용하여 응답 생성
-        # if len(st.session_state.messages) % 2 ==1:
-        #     qu_answer = st.session_state.messages[-2:]
-        #     # stream = client.chat.completions.create(
-        #     #     model="gpt-4o-mini",
-        #     #     messages=[
-        #     #         {"role": 'user', "content": introduction + feedback_prompt + qu_answer}
-        #     #     ],
-        #     #     stream=True,
-        #     # )
-
-        #     # 응답을 채팅에 스트리밍하고 세션 상태에 저장
-        #     # with st.chat_message("assistant"):
-        #     #     response = st.write_stream(stream)
-                    
-        st.write(st.session_state.feedback)
+        if st.session_state.feedback:
+            st.write(st.session_state.feedback[-1])
