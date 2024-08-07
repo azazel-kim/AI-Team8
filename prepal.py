@@ -1,5 +1,22 @@
 import streamlit as st
 from openai import OpenAI
+from gtts import gTTS
+import os
+import time
+
+# 음성은 아직 잘 되는지 확인 필요
+# 음성 생성 및 재생 함수
+def text_to_speech(text, lang='ko'):
+    """
+    입력된 텍스트를 음성으로 변환하고 재생합니다.
+    :param text: 음성으로 변환할 텍스트
+    :param lang: 음성 언어 (기본값: 한국어)
+    """
+    tts = gTTS(text=text, lang=lang)
+    # tts.save("speech.mp3")
+    # os.system("start speech.mp3")  # Windows
+    # Mac이나 Linux의 경우: os.system("afplay speech.mp3")
+    time.sleep(len(text) * 0.1)  # 음성이 재생될 때까지 대기
 
 openai_api_key = 'openapi-key'
 # OpenAI 클라이언트 생성
@@ -7,24 +24,44 @@ client = OpenAI(api_key=openai_api_key)
 
 if 'messages' not in st.session_state:
     st.session_state.messages = []
+if 'introduction' not in st.session_state:
+    st.session_state.introduction = ''
 if 'introduction_submitted' not in st.session_state:
     st.session_state.introduction_submitted = False
 if 'feedback' not in st.session_state:
     st.session_state.feedback = []
-    # feedback_prompt = "이렇게 영업 직무에 신입으로 지원하고자 하는 사람의 자소서가 있어. 그리고 크라운제과의 성장을 언급하셨습니다. 이 회사가 다른 기업들과 비교하여 특별히 매력적이라고 느낀 이유는 무엇인가요? 멋있어어요 이런식으로 면접 질문과 그에 대한 답변이 주어질거야. 그러면 자소서를 바탕으로 질문에 대한 답변이 올바른지, 부족하거나 고쳐야 할 부분이 있다면 무엇이 있을지 적극적으로 피드백 해줬으면 좋겠어. 출력 형식을 예시를 들어주면 만약 답변이 부실할 경우에는 개선점 : ~~ 답변 예시: ~~ 이렇게 보여줬으면 좋겠고 좋은 답변을 했을 경우에도 어느 부분이 좋았는지 간단하게 설명해주면 좋을 것 같아. 여기서 출력시 주의사항은 알겠습니다. 피드백을 작성하겠습니다. 이런 텍스트 없이 그냥 깔끔하게 개선점 : ~~ 답변 예시: ~~ 이런 피드백에 관련된 텍스트들만 출력될 수 있게 해줘"
-
 
 # 페이지 설정
 st.set_page_config(page_title="AI 모의 면접 서비스", layout="wide")
 
-# 헤더
-st.title("AI 모의 면접 서비스")
-st.write("실전 같은 면접 연습과 피드백을 제공합니다.")
+# # 헤더
+st.markdown("""
+    <style>
+    .big-font {
+        font-size: 72px !important;
+        color: white;
+        text-align: center;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        font-weight: bold;
+    }
+    .sub-font {
+        font-size: 30px !important;
+        color: gray;
+        text-align: center;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+st.markdown('<p class="big-font">AI 모의 면접 서비스</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-font">실전 같은 면접 연습과 피드백을 제공합니다.</p>', unsafe_allow_html=True)
+# 구분선 추가
+st.markdown("<hr>", unsafe_allow_html=True)
 
 # 자기소개서 제출
 if not st.session_state.introduction_submitted:
     st.subheader("자기소개서 제출")
     introduction = st.text_area("자기소개서를 입력하세요", height=200)
+    st.session_state.introduction = introduction
 
     if st.button("제출"):
         if introduction:
@@ -51,78 +88,66 @@ if not st.session_state.introduction_submitted:
             with st.chat_message("assistant"):
                 response = st.write_stream(stream)
             st.session_state.messages.append({"role": "assistant", "content": response})
-
+            # 음성으로 응답 재생
+            text_to_speech(response)
             
             st.rerun()
         else:
             st.warning("자기소개서 제출 후 버튼을 눌러주세요")
 
 else:
-    introduction = st.text_area("자기소개서를 입력하세요", height=200)
+    # introduction = st.text_area("자기소개서를 입력하세요", height=200)
     prompt = st.chat_input("질문에 답변하세요.")
-    # 레이아웃 설정
-    col1, col2 = st.columns(2)
-
-    with col1:
         # 챗봇 대화 형식
-        st.subheader("면접 챗봇과 대화하기")
+    st.subheader("면접 챗봇과 대화하기")
 
-        # 기존 채팅 메시지 표시
-        for messages in st.session_state.messages[2:]:
-            with st.chat_message(messages["role"]):
-                st.markdown(messages["content"])
-    
-        # 사용자의 응답 입력
-        if prompt:
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+    # 기존 채팅 메시지 표시
+    for i, message in enumerate(st.session_state.messages[2:]):  # 2부터 시작하여 답변 메시지만 표시
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+        # 피드백을 드롭다운 형식으로 표시
+        if i>0 and i%2 == 1:
+            with st.expander("피드백"):
+                st.write(st.session_state.feedback[(i-1)//2])
 
-            # OpenAI API를 사용하여 응답 생성
-            if st.session_state.messages:
-                stream = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": m["role"], "content": m["content"]}
-                        for m in st.session_state.messages
-                    ],
-                    stream=True,
-                )
-
-                # 응답을 채팅에 스트리밍하고 세션 상태에 저장
-                with st.chat_message("assistant"):
-                    response = st.write_stream(stream)
-                st.session_state.messages.append({"role": "assistant", "content": response})   
-
-            feedback_prompt = f"""
-            자소서:
-            {introduction}
-            질문:
-            {st.session_state.messages[-3]['content']}
-            답변:
-            {st.session_state.messages[-2]['content']}
-            이렇게 영업 직무에 신입으로 지원하고자 하는 사람의 자소서가 있어.
-            그리고 크라운제과의 성장을 언급하셨습니다.
-            이 회사가 다른 기업들과 비교하여 특별히 매력적이라고 느낀 이유는 무엇인가요? 멋있어어요
-            이런식으로 면접 질문과 그에 대한 답변이 주어질거야. 그러면 자소서를 바탕으로 질문에 대한 답변이 올바른지,
-            부족하거나 고쳐야 할 부분이 있다면 무엇이 있을지 적극적으로 피드백 해줬으면 좋겠어.
-            출력 형식을 예시를 들어주면 만약 답변이 부실할 경우에는 개선점 : ~~ 답변 예시: ~~ 이렇게 보여줬으면 좋겠고
-            좋은 답변을 했을 경우에도 어느 부분이 좋았는지 간단하게 설명해주면 좋을 것 같아. 여기서 출력시 주의사항은 알겠습니다.
-            피드백을 작성하겠습니다. 이런 텍스트 없이 그냥 깔끔하게 개선점 : ~~ 답변 예시: ~~ 이런 피드백에 관련된 텍스트들만 출력될 수 있게 해줘
-            """
-            feedback_response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": feedback_prompt}
-            ],
-            # stream=True,
+    # 사용자의 응답 입력
+    if prompt:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        feedback_prompt = f"""
+        나는 지금 영업직 신입사원 채용 면접을 연습하고 있어. 면접관은 아래 면접질문 플랜에 따라서 나를 평가한다고 해. 
+        면접 질문 플랜 1. 아이스트 브레이킹 (Ice-breaking). 면접 시작 전 긴장을 풀어주고 지원자와 면접관 간의 라포를 형성하기 위한 간단한 질문들. 2. 자기소개 및 학업이나 경험. 지원자의 배경, 교육, 경험을 파악하는 단계. 3. 동기 및 목표. 지원자가 왜 이 직무에 지원했는지, 그리고 앞으로의 목표가 무엇인지 이해하는 단계. 4. 직무 관련 기술 및 역량 평가. 영업 사원으로서 필요한 기술 및 역량을 평가하는 단계. 5. 문제 해결 능력. 예상치 못한 상황에서의 대처 능력을 평가하는 단계. 6. 문화 적합성. 지원자가 회사의 문화와 잘 맞는지 평가하는 단계. 7. 추가 질문 및 마무리. 지원자의 궁금증을 해소하고, 마지막으로 하고 싶은 말을 들어보는 단계. 
+        내가 받은 면접질문과 나의 답변을 보내줄 테니까 나의 답변이 면접질문 의도에 적절하고 좋은 답변인지 피드백 해줘. 
+        참고용으로 나의 자소서도 보여줄게. 자소서를 바탕으로 질문에 대한 답변이 올바른지, 부족하거나 고쳐야 할 부분이 있다면 무엇이 있을지 적극적으로 피드백 해줬으면 좋겠어.
+        자소서: {st.session_state.introduction}
+        출력 형식을 예시를 들어주면 만약 답변이 부실할 경우에는 개선점 : ~~ 답변 예시: ~~ 이렇게 보여줬으면 좋겠고 좋은 답변을 했을 경우에도 어느 부분이 좋았는지 간단하게 설명해주면 좋을 것 같아. 여기서 출력시 주의사항은 '알겠습니다.'  '피드백을 작성하겠습니다.' 이런 텍스트 없이 그냥 깔끔하게 '개선점 : ~~' '답변 예시: ~~' 이런 피드백에 관련된 텍스트들만 출력될 수 있게 해줘
+        면접질문: '{st.session_state.messages[-2]['content']}'
+        나의 답변: '{st.session_state.messages[-1]['content']}'
+        """
+        feedback_response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "user", "content": feedback_prompt}
+        ],
+        # stream=True,
+        )
+        st.session_state.feedback.append(feedback_response.choices[0].message.content)
+        with st.expander("피드백"):
+            st.write(feedback_response.choices[0].message.content)
+        # OpenAI API를 사용하여 응답 생성
+        if st.session_state.messages:
+            stream = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": m["role"], "content": m["content"]}
+                    for m in st.session_state.messages
+                ],
+                stream=True,
             )
-            st.session_state.feedback.append(feedback_response.choices[0].message.content)
-
-    with col2:  
-        # 피드백 생성
-        # feedback = "좋은 답변입니다. 하지만 좀 더 구체적인 예시를 들어주시면 좋겠습니다."
-        
-        st.subheader("피드백")
-        if st.session_state.feedback:
-            st.write(st.session_state.feedback[-1])
+            # 응답을 채팅에 스트리밍하고 세션 상태에 저장
+            with st.chat_message("assistant"):
+                response = st.write_stream(stream)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+             # 음성으로 응답 재생
+            text_to_speech(response)
