@@ -1,23 +1,13 @@
 import streamlit as st
 from openai import OpenAI
-from gtts import gTTS
-import os
-import time
+import pyttsx3
 
-# 음성은 아직 잘 되는지 확인 필요
 # 음성 생성 및 재생 함수
-def text_to_speech(text, lang='ko'):
-    """
-    입력된 텍스트를 음성으로 변환하고 재생합니다.
-    :param text: 음성으로 변환할 텍스트
-    :param lang: 음성 언어 (기본값: 한국어)
-    """
-    tts = gTTS(text=text, lang=lang)
-    # tts.save("speech.mp3")
-    # os.system("start speech.mp3")  # Windows
-    # Mac이나 Linux의 경우: os.system("afplay speech.mp3")
-    time.sleep(len(text) * 0.1)  # 음성이 재생될 때까지 대기
-
+def text_to_speech(text):
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
+    
 openai_api_key = 'openapi-key'
 # OpenAI 클라이언트 생성
 client = OpenAI(api_key=openai_api_key)
